@@ -1,0 +1,9 @@
+{
+	"name": "mupic/wp-api-yoast-meta",
+	"version": "1.0.0",
+	"require": {
+	},
+	"autoload": {
+		"files": ["plugin.php"]
+	}
+}
