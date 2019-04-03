@@ -1,15 +1,21 @@
 <?php
-
-add_action( 'plugins_loaded', 'WPAPIYoast_init' );
-
 /**
  * Plugin Name: Yoast to REST API
- * Description: Adds Yoast fields to page and post metadata to WP REST API responses
- * Author: Niels Garve, Pablo Postigo, Tedy Warsitha, Charlie Francis
- * Author URI: https://github.com/niels-garve
- * Version: 1.4.2
- * Plugin URI: https://github.com/niels-garve/yoast-to-rest-api
+ * Description: Adds Yoast fields to page and post metadata to WP REST API responses. Version for composer.
+ * Author: Lopatin Daniil
+ * Author URI: https://github.com/mupic
+ * Version: 1.1.0
+ * Plugin URI: https://github.com/mupic/yoast-to-rest-api
  */
+
+//GET params will take precedence over constants
+if(!defined('YOAST_REST_META')) //false - Disable automatic meta seo input
+	define('YOAST_REST_META', true);
+if(!defined('YOAST_REST_OG')) //false - Disable automatic open graph input
+	define('YOAST_REST_OG', false);
+if(!defined('YOAST_REST_TW')) //false - Disable automatic meta twitter input
+	define('YOAST_REST_TW', false);
+
 class Yoast_To_REST_API {
 
 	protected $keys = array(
@@ -60,7 +66,7 @@ class Yoast_To_REST_API {
 		register_rest_field( 'category',
 			'yoast_meta',
 			array(
-				'get_callback'    => array( $this, 'wp_api_encode_yoast_category' ),
+				'get_callback'    => array( $this, 'wp_api_encode_yoast_tax' ),
 				'update_callback' => null,
 				'schema'          => null,
 			)
@@ -70,11 +76,27 @@ class Yoast_To_REST_API {
 		register_rest_field( 'tag',
 			'yoast_meta',
 			array(
-				'get_callback'    => array( $this, 'wp_api_encode_yoast_tag' ),
+				'get_callback'    => array( $this, 'wp_api_encode_yoast_tax' ),
 				'update_callback' => null,
 				'schema'          => null,
 			)
 		);
+
+		$taxonomies = get_taxonomies(array(
+			'show_in_rest' => true,
+			'_builtin' => false
+		));
+
+		foreach( $taxonomies as $taxonomy ) {
+			register_rest_field( $taxonomy,
+				'yoast_meta',
+				array(
+					'get_callback'    => array( $this, 'wp_api_encode_yoast_tax' ),
+					'update_callback' => null,
+					'schema'          => null,
+				)
+			);
+		}
 
 		// Public custom post types
 		$types = get_post_types( array(
@@ -82,7 +104,7 @@ class Yoast_To_REST_API {
 			'_builtin' => false
 		) );
 
-		foreach ( $types as $key => $type ) {
+		foreach ( $types as $type ) {
 			register_rest_field( $type,
 				'yoast_meta',
 				array(
@@ -92,6 +114,27 @@ class Yoast_To_REST_API {
 				)
 			);
 		}
+
+
+		/* register route <*/
+
+		/*register_rest_route( 'yoast_api/v1', '/home', array(
+			'methods'  => 'GET',
+			'callback' => 'myplug_get_post_items',
+			'args' => array(
+				'id' => array(
+					'default' => false,
+					'validate_callback' => function($param, $request, $key) {
+						return is_numeric( $param );
+					},
+				),
+				'post_type' => array(
+					'default' => false,
+				),
+			),
+		) );*/
+
+		/*> register route */
 	}
 
 	/**
@@ -116,15 +159,33 @@ class Yoast_To_REST_API {
 	}
 
 	function wp_api_encode_yoast( $p, $field_name, $request ) {
+		$yoast_meta = $request->get_param('yoast_meta');
+		$allow_seo = $yoast_meta !== '' && $yoast_meta !== null? $yoast_meta : YOAST_REST_META;
+
+		if($allow_seo == false)
+			return false;
+
 		$wpseo_frontend = WPSEO_Frontend_To_REST_API::get_instance();
 		$wpseo_frontend->reset();
 
 		query_posts( array(
 			'p'         => $p['id'], // ID of a page, post, or custom type
-			'post_type' => 'any'
+			'post_type' => 'any',
+			'no_found_rows' => true,
 		) );
 
 		the_post();
+
+		/* big crutch for yoast */
+		global $post, $wp_the_query;
+		$wp_the_query->queried_object = $post;
+		$wp_the_query->is_singular = true;
+		if($p['type'] == 'post')
+			$wp_the_query->is_single = true;
+		if($p['type'] == 'page')
+			$wp_the_query->is_page = true;
+
+		$wpseo_og = new WPSEO_OpenGraph_Twitter_To_REST_API();
 
 		$yoast_meta = array(
 			'yoast_wpseo_title'     => $wpseo_frontend->get_content_title(),
@@ -132,10 +193,12 @@ class Yoast_To_REST_API {
 			'yoast_wpseo_canonical' => $wpseo_frontend->canonical( false ),
 		);
 
+		$og = $wpseo_og->get_meta_data($request);
+		$yoast_meta = array_merge($yoast_meta, $og);
+
 		/**
 		 * Filter the returned yoast meta.
 		 *
-		 * @since 1.4.2
 		 * @param array $yoast_meta Array of metadata to return from Yoast.
 		 * @param \WP_Post $p The current post object.
 		 * @param \WP_REST_Request $request The REST request.
@@ -143,24 +206,44 @@ class Yoast_To_REST_API {
 		 */
 		$yoast_meta = apply_filters( 'wpseo_to_api_yoast_meta', $yoast_meta, $p, $request );
 
-		wp_reset_query();
-
 		return (array) $yoast_meta;
 	}
 
-	private function wp_api_encode_taxonomy() {
+	function wp_api_encode_yoast_tax( $tax, $field_name, $request ) {
+		$yoast_meta = $request->get_param('yoast_meta');
+		$allow_seo = $yoast_meta !== '' && $yoast_meta !== null? $yoast_meta : YOAST_REST_META;
+
+		if($allow_seo == false)
+			return false;
+
+		/* big crutch for yoast */
+		global $wp_the_query;
+		$wp_the_query->queried_object = get_term( $tax['id'], $tax['taxonomy'] );
+		$wp_the_query->is_tax = true;
+		$wp_the_query->tax_query->queried_terms[ $tax['taxonomy'] ]['terms'] = false;
+
+		$res = $this->wp_api_encode_taxonomy($request);
+
+		return $res;
+	}
+
+	private function wp_api_encode_taxonomy($request) {
 		$wpseo_frontend = WPSEO_Frontend_To_REST_API::get_instance();
 		$wpseo_frontend->reset();
+
+		$wpseo_og = new WPSEO_OpenGraph_Twitter_To_REST_API();
 
 		$yoast_meta = array(
 			'yoast_wpseo_title'    => $wpseo_frontend->get_taxonomy_title(),
 			'yoast_wpseo_metadesc' => $wpseo_frontend->metadesc( false ),
 		);
 
+		$og = $wpseo_og->get_meta_data($request);
+		$yoast_meta = array_merge($yoast_meta, $og);
+
 		/**
 		 * Filter the returned yoast meta for a taxonomy.
 		 *
-		 * @since 1.4.2
 		 * @param array $yoast_meta Array of metadata to return from Yoast.
 		 * @return array $yoast_meta Filtered meta array.
 		 */
@@ -168,44 +251,15 @@ class Yoast_To_REST_API {
 
 		return (array) $yoast_meta;
 	}
-
-	function wp_api_encode_yoast_category( $category ) {
-		query_posts( array(
-			'cat' => $category['id'],
-		) );
-
-		the_post();
-
-		$res = $this->wp_api_encode_taxonomy();
-
-		wp_reset_query();
-
-		return $res;
-	}
-
-	function wp_api_encode_yoast_tag( $tag ) {
-		query_posts( array(
-			'tag_id' => $tag['id'],
-		) );
-
-		the_post();
-
-		$res = $this->wp_api_encode_taxonomy();
-
-		wp_reset_query();
-
-		return $res;
-	}
 }
 
-function WPAPIYoast_init() {
-	if ( class_exists( 'WPSEO_Frontend' ) ) {
-		include __DIR__ . '/classes/class-wpseo-frontend-to-rest-api.php';
+if ( class_exists( 'WPSEO_Frontend' ) ) {
+	include __DIR__ . '/classes/class-wpseo-frontend-to-rest-api.php';
+	include __DIR__ . '/classes/class-wpseo-opengraph-twitter-to-rest-api.php';
 
-		$yoast_To_REST_API = new Yoast_To_REST_API();
-	} else {
-		add_action( 'admin_notices', 'wpseo_not_loaded' );
-	}
+	new Yoast_To_REST_API();
+} else {
+	add_action( 'admin_notices', 'wpseo_not_loaded' );
 }
 
 function wpseo_not_loaded() {
