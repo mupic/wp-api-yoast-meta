@@ -49,7 +49,7 @@ define('YOAST_REST_TW', false); //false - Disable automatic meta twitter input
 }
 ```
 
-Supports pages, posts, categories, tags and any *public* custom post types
+Supports pages, posts, any *public* custom post types, categories, tags, any *public* custom taxonomies
 
 Currently fetching:
 
