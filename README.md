@@ -111,6 +111,20 @@ define('YOAST_REST_SCHEMA', false); //false - Disable automatic microdata input.
 }
 ```
 
+```
+//wp-json/wp/v2/posts/123?yoast_meta=true&breadcrumbs=html
+{
+	id: 123,
+	...
+	yoast:{
+		breadcrumbs: {
+			html: "<span><span><a href="http://example.com/" >Home</a> » <span><a href="http://example.com/category/news/" >News</a> » <span class="breadcrumb_last" aria-current="page">Title</span></span></span></span>"
+		},
+		meta: {...}
+	}
+}
+```
+
 Supports pages, posts, any *public* custom post types, categories, tags, any *show_in_rest* custom taxonomies
 
 Currently fetching:
