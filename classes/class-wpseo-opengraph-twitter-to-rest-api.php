@@ -5,6 +5,21 @@
 
 class WPSEO_OpenGraph_Twitter_To_REST_API extends WPSEO_OpenGraph{
 
+	public static $instance;
+
+	/**
+	 * Get the singleton instance of this class.
+	 *
+	 * @return WPSEO_Frontend
+	 */
+	public static function get_instance() {
+		if ( ! ( self::$instance instanceof self ) ) {
+			self::$instance = new self();
+		}
+
+		return self::$instance;
+	}
+
 	function my_array_combine($keys, $values){
 		$result = array();
 		foreach ($keys as $i => $k) {
@@ -41,11 +56,9 @@ class WPSEO_OpenGraph_Twitter_To_REST_API extends WPSEO_OpenGraph{
 		return $this->my_array_combine($out[1], $out[2]);
 	}
 
-	public function get_meta_data($request = null){
-		$opengraph = is_object($request) && get_class($request) == 'WP_REST_Request'? $request->get_param('yoast_opengraph') : null;
-		$twitter = is_object($request) && get_class($request) == 'WP_REST_Request'? $request->get_param('yoast_twitter') : null;
-		$opengraph = $opengraph == null? YOAST_REST_OG : $opengraph;
-		$twitter = $twitter == null? YOAST_REST_TW : $twitter;
+	public function get_og_data($allow){
+		$opengraph = $allow['opengraph'];
+		$twitter = $allow['twitter'];
 
 		ob_start();
 
