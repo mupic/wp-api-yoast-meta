@@ -20,6 +20,9 @@ if(!defined('YOAST_REST_BC')) //true - Return json breadcrumbs. "html" - Return 
 if(!defined('YOAST_REST_SCHEMA')) //false - Disable automatic microdata input.
 	define('YOAST_REST_SCHEMA', false);
 
+if(!defined('YOAST_REST_ENABLE_EMBED')) //false - Disable yoast in fields called from _embed=true.
+	define('YOAST_REST_ENABLE_EMBED', false);
+
 class Yoast_To_REST_API {
 
 	protected $keys = array(
@@ -49,11 +52,12 @@ class Yoast_To_REST_API {
 
 	private function classes_init(){
 		$this->wpseo_frontend = WPSEO_Frontend_To_REST_API::get_instance();
-		$this->wpseo_og = WPSEO_OpenGraph_Twitter_To_REST_API::get_instance();
 		$this->schema_rest = new WPSEO_Schema_To_REST_API();
 	}
 
 	private function allowed(){
+		$this->allow['yoast_embed'] = isset($_GET['yoast_embed']) && ($this->is_bool($_GET['yoast_embed']) || $_GET['yoast_embed'])? $this->parse_bool($_GET['yoast_embed']) : YOAST_REST_ENABLE_EMBED;
+
 		$this->allow['meta'] = isset($_GET['yoast_meta']) && ($this->is_bool($_GET['yoast_meta']) || $_GET['yoast_meta'])? $this->parse_bool($_GET['yoast_meta']) : YOAST_REST_META;
 		$this->allow['opengraph'] = isset($_GET['opengraph']) && ($this->is_bool($_GET['opengraph']) || $_GET['opengraph'])? $this->parse_bool($_GET['opengraph']) : YOAST_REST_META;
 		$this->allow['twitter'] = isset($_GET['twitter']) && ($this->is_bool($_GET['twitter']) || $_GET['twitter'])? $this->parse_bool($_GET['twitter']) : YOAST_REST_META;
@@ -149,6 +153,15 @@ class Yoast_To_REST_API {
 		/*> register route */
 	}
 
+	protected $is_main_request = false;
+	protected function is_main_request($func_name){
+		if($this->is_main_request === false){
+			$this->is_main_request = $func_name;
+		}
+
+		return $this->is_main_request === $func_name;
+	}
+
 	/**
 	 * Updates post meta with values from post/put request.
 	 *
@@ -171,6 +184,9 @@ class Yoast_To_REST_API {
 	}
 
 	function wp_api_encode_yoast_home( $request ) {
+
+		if(!$this->allow['yoast_embed'] && !$this->is_main_request(__FUNCTION__))
+			return false;
 
 		$this->wpseo_frontend->reset();
 
@@ -201,7 +217,9 @@ class Yoast_To_REST_API {
 			'canonical' => $this->wpseo_frontend->canonical( false ),
 		);
 
-		$og = $this->wpseo_og->get_og_data($this->allow);
+		$wpseo_og = new WPSEO_OpenGraph_Twitter_To_REST_API();
+
+		$og = $wpseo_og->get_og_data($this->allow);
 		$yoast_meta = array_merge($yoast_meta, $og);
 
 		/**
@@ -227,6 +245,9 @@ class Yoast_To_REST_API {
 	}
 
 	function wp_api_encode_yoast( $p, $field_name, $request ) {
+
+		if(!$this->allow['yoast_embed'] && !$this->is_main_request(__FUNCTION__))
+			return false;
 
 		if(!$this->allow['meta'])
 			return false;
@@ -258,7 +279,9 @@ class Yoast_To_REST_API {
 			'canonical' => $this->wpseo_frontend->canonical( false ),
 		);
 
-		$og = $this->wpseo_og->get_og_data($this->allow);
+		$wpseo_og = new WPSEO_OpenGraph_Twitter_To_REST_API();
+
+		$og = $wpseo_og->get_og_data($this->allow);
 		$yoast_meta = array_merge($yoast_meta, $og);
 
 		/**
@@ -286,6 +309,9 @@ class Yoast_To_REST_API {
 
 	function wp_api_encode_yoast_tax( $tax, $field_name, $request ) {
 
+		if(!$this->allow['yoast_embed'] && !$this->is_main_request(__FUNCTION__))
+			return false;
+
 		if(!$this->allow['meta'])
 			return false;
 
@@ -309,7 +335,9 @@ class Yoast_To_REST_API {
 			'description' => $this->wpseo_frontend->metadesc( false ),
 		);
 
-		$og = $this->wpseo_og->get_og_data($this->allow);
+		$wpseo_og = new WPSEO_OpenGraph_Twitter_To_REST_API();
+
+		$og = $wpseo_og->get_og_data($this->allow);
 		$yoast_meta = array_merge($yoast_meta, $og);
 
 		/**
@@ -438,7 +466,7 @@ if (
 	&& class_exists( 'WPSEO_OpenGraph' )
 	&& class_exists( 'WPSEO_Twitter' )
 	&& class_exists( 'WPSEO_Breadcrumbs' )
-	&& class_exists( 'WPSEO_JSON_LD' )
+	&& class_exists( 'WPSEO_Schema' )
 ) {
 	include __DIR__ . '/classes/class-wpseo-frontend-to-rest-api.php';
 	include __DIR__ . '/classes/class-wpseo-opengraph-twitter-to-rest-api.php';

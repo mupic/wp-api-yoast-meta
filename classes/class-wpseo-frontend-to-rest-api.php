@@ -8,4 +8,7 @@
  * default WordPress output.
  */
 class WPSEO_Frontend_To_REST_API extends WPSEO_Frontend {
+	// function __construct(){
+		
+	// }
 }

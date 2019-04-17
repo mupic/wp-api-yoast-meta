@@ -1,6 +1,8 @@
 
 # Yoast to REST API v2
 
+# Supports Yoast SEO >= 11.0
+
 # Install
 
 ```
@@ -14,11 +16,13 @@ Returns Yoast post or page metadata in a normal post or page request. Stores the
 # Default constants
 ```
 //GET params will take precedence over constants
-define('YOAST_REST_META', false); //false - Disable automatic meta seo input
-define('YOAST_REST_OG', false); //false - Disable automatic open graph input
-define('YOAST_REST_TW', false); //false - Disable automatic meta twitter input
-define('YOAST_REST_BC', false); //true - Return json breadcrumbs. "html" - Return html generated breadcrumbs.
-define('YOAST_REST_SCHEMA', false); //false - Disable automatic microdata input.
+define('YOAST_REST_META', false); //false - Disable automatic meta seo input. (Equivalent in get request: meta=false)
+define('YOAST_REST_OG', false); //false - Disable automatic open graph input. (Equivalent in get request: opengraph=false)
+define('YOAST_REST_TW', false); //false - Disable automatic meta twitter input. (Equivalent in get request: twitter=false)
+define('YOAST_REST_BC', false); //true - Return json breadcrumbs. "html" - Return html generated breadcrumbs. (Equivalent in get request: breadcrumbs=false)
+define('YOAST_REST_SCHEMA', false); //false - Disable automatic microdata input. (Equivalent in get request: schema=false)
+
+define('YOAST_REST_ENABLE_EMBED', false); //false - Disable yoast in fields called from _embed=true. (Equivalent in get request: yoast_embed=false)
 ```
 
 # Examples
@@ -69,10 +73,7 @@ define('YOAST_REST_SCHEMA', false); //false - Disable automatic microdata input.
 			twitter:image: "http://example.com/wp-content/uploads/2019/01/6JHYYbvoSuQ95ceGx8Oeg8zzAjg.jpg"
 			twitter:title: "Title - site"
 		},
-		schema: {
-			breadcrumbs: "{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"item":{"@id":"http://example.com/","name":"Home"}},{"@type":"ListItem","position":2,"item":{"@id":"http://example.com/category/news/","name":"News"}},{"@type":"ListItem","position":3,"item":{"@id":"http://example.com/news/title/","name":"Title"}}]}",
-			organization: "{"@context":"https://schema.org","@type":"Organization","url":"http://example.com/","sameAs":[],"@id":"http://example.com/#organization","name":"My super company","logo":"http://example.com/wp-content/uploads/2019/02/7e55b905c43b67479065761d49f0dcb8-2.png"}"
-		}
+		schema: "{"@context":"https://schema.org","@graph":[...]}" //all schemes
 	}
 }
 ```
